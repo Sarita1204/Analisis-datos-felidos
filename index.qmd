@@ -1,0 +1,202 @@
+---
+title: "Análisis de félidos de Costa Rica"
+author: Sarita Venegas Vargas 
+format: html
+toc: true
+theme: flaty
+---
+
+# Carga paquetes
+
+```{r}
+#| label: carga-paquetes
+#| message: false
+#| warning: false
+
+library(tidyverse)
+library(plotly)
+library(sf)
+library(leaflet)
+library(leaflet.extras)
+library(leafem)
+```
+
+# Carga datos
+
+```{r}
+#| label: carga-datos
+
+provincias <-
+  st_read("provincias.geojson", quiet = TRUE)
+
+felidos <- 
+  st_read("felidos.csv",
+          options = c("X_POSSIBLE_NAMES=decimalLongitude", 
+                      "Y_POSSIBLE_NAMES=decimalLatitude"
+    ))
+quiet = TRUE
+
+```
+
+```{r}
+#| label: simplificacion
+
+provincias <-
+  provincias|>
+  st_simplify(dTolerance = 25, preserveTopology = TRUE)
+
+```
+
+```{r}
+#| label: asignar-crs
+
+ provincias <- 
+  provincias |> 
+  st_transform(4326)
+
+
+  st_crs(felidos) <- 4326
+```
+
+# Análisis de datos
+
+# Tabla
+
+```{r}
+#| label: tabla-felidos
+#| eval: false
+
+felidos |>
+  st_drop_geometry() |>
+  mutate(eventDate = as.Date(eventDate)) |>
+  select(species, eventDate, stateProvince, locality, decimalLongitude, decimalLatitude) |>
+  datatable (
+    colnames=c("Especies", "Fecha", "Provincia", " Localidad", "Longitud", "Latitud"),
+    options = list(
+      pageLength = 5,
+      language = list(url = '//cdn.datatables.net/plug-ins/1.10.11/i18n/Spanish.json')
+    )
+  )
+    
+```
+
+# Gráficos
+
+```{r}
+#| label: grafico-registros-por-especie
+#| eval: false
+
+grafico_plotly <-
+felidos |>
+   st_drop_geometry() |>
+  ggplot(aes(x = species)) + 
+  geom_bar() +
+  ggtitle("Cantidad de registros por especie") +
+  xlab("Especie") +
+  ylab("Cantidad de especies") +
+  coord_flip() 
+  
+
+ggplotly(grafico_plotly) |> config(locale = "es")
+
+```
+
+Cantidad de registros de félidos por mes del año. Las barras deben estar ordenadas por mes
+
+```{r}
+#| label: grafico-registros-por-mes
+#| eval: false
+
+grafico_ggplot2 <-
+felidos |>
+   st_drop_geometry() |>
+  mutate((month = as.integer(month))) |>
+  ggplot(aes(x = month)) +
+  geom_bar() +
+  ggtitle("Cantidad de registros por mes") +
+  xlab("Mes") +
+  ylab ("Cantidad de registros") 
+
+
+ggplotly(grafico_ggplot2) |> config(locale = "es")
+  
+```
+
+
+# Mapa
+```{r}
+
+#| label: mapa
+
+# Mapa leaflet básico con capas de altitud, provincias y registros de presencia de félidos
+leaflet() %>%
+  setView(# centro y nivel inicial de acercamiento
+    lng = -84.19452,
+    lat = 9.572735,
+    zoom = 7) |>  
+  addTiles(group = "Mapa general (OpenStreetMap)") |>
+  addPolygons(
+    data = provincias,
+    color = "black",
+    fillColor = "transparent",
+    stroke = TRUE,
+    weight = 1.0,
+    group = "Provincias"
+  ) |>
+  addCircleMarkers(
+    data = felidos,
+    stroke = F,
+    radius = 4,
+    fillColor = 'blue',
+    fillOpacity = 1,
+    popup = paste(
+      paste0("<strong>Especie: </strong>", felidos$species),
+      paste0("<strong>Localidad: </strong>", felidos$locality),
+      paste0("<strong>Fecha: </strong>", felidos$eventDate),
+      paste0("<strong>Fuente: </strong>", felidos$institutionCode),
+      paste0("<a href='", felidos$occurrenceID, "'>Más información</a>"),
+      sep = '<br/>'
+    ),
+    group = "Félidos"    
+  ) |>
+  addLayersControl(
+    # control de capas
+    baseGroups = c(
+      "Mapa general (OpenStreetMap)"
+    ),
+    overlayGroups = c("Provincias", "Félidos")
+  ) |>
+  addResetMapButton() |> # botón de reinicio
+  addSearchOSM() |> # búsqueda en OSM
+  addMouseCoordinates() |> # coordenadas del puntero del ratón
+  addScaleBar(
+    position = "bottomleft", 
+    options = scaleBarOptions(imperial = FALSE)
+  ) |> # barra de escala
+  addMiniMap(position = "bottomright") |> # mapa de ubicación
+  addFullscreenControl() # mapa de pantalla completa  
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
